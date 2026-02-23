@@ -1,10 +1,14 @@
-﻿using HarmonyLib;
-using ResoniteModLoader;
+﻿using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
-using Elements.Assets;
-using System.Reflection;
+using FrooxEngine.UIX;
+using HarmonyLib;
+using ResoniteModLoader;
+using System;
 using System.Collections.Generic;
+using System.Reflection;
+using FrooxEngine.Store;
+using System.Threading.Tasks;
 
 namespace AnimatorAdditions
 {
@@ -25,31 +29,27 @@ namespace AnimatorAdditions
         public override void OnEngineInit()
         {
             Harmony harmony = new Harmony($"{Author}.{Name}");
-            Config = GetConfiguration();
-            Config.Save(true);
             Msg("patching method for animator ui");
-
+            harmony.Patch(typeof(Animator).GetMethod(nameof(Animator.BuildInspectorUI)), postfix: new HarmonyMethod(AnimatorAdditionsPatch.PostFix));
             harmony.PatchAll();
 
         }
 
-
-        [HarmonyPatch]
-        public class AnimatorAdditions
+        public class AnimatorAdditionsPatch
         {
-            [HarmonyPostfix(typeof(FrooxEngine.Animator), "BuildInspectorUI")]
-            public static bool PostFix(Animator __instance, UIBuilder ui)
+            public static void PostFix(Animator __instance, UIBuilder ui)
             {
-                ui.Header("Animator Additions");
-                ui.Button("Wipe Unneeded Fields", () =>
+                ui.Text("Animator Additions");
+                var button = ui.Button("Wipe Unneeded Fields");
+                button.LocalPressed += (IButton button, ButtonEventData data) =>
                 {
-                    WipeUnneededFields(__instance);
-                });
-                return true; // Continue with the original method after our additions
+                    WipeUnneededFieldsAsync(__instance);
+                };
             }
 
-            public static void WipeUnneededFields(Animator __instance)
+            public static async Task WipeUnneededFieldsAsync(Animator __instance)
             {
+                Msg("finding unneeded fields");
                 List<int> unneeded_fields = new List<int>();
                 for (int i = 0; i < __instance.Fields.Count; i++)
                 {
@@ -60,27 +60,39 @@ namespace AnimatorAdditions
                     }
                 }
 
-                unneeded_fields.Reverse()// Remove from the end to avoid index shifting
+                unneeded_fields.Reverse();// Remove from the end to avoid index shifting
+                Msg("creating stream of old data");
+                System.IO.Stream data = await Engine.Current.LocalDB.TryOpenAsset(((StaticAnimationProvider)__instance.Clip.Target).URL);
+                Msg("setting anim data to stream of old data");
+                AnimX animation = new AnimX(data, false);
+                Msg("cleaning animation data");
                 //yeet the unused fields since we don't need them
-                AnimX new_Anim = new AnimX();
-                __instance.Clip.Asset.Data
-                foreach (int i in )
+                __instance.World.RunSynchronously(() =>
                 {
-                    
-                    .RemoveTrackAt(i);
-                }
-                for (int i = 0; i < __instance.Clip.Asset.Data.Count; i++)
-                {
-                    if(!unneeded_fields.Contains(i)){
-                        new_Anim.AddTrack(__instance.Clip.Asset.Data[i]); //copy over needed tracks
-                    }
-                    else
+                    foreach (int i in unneeded_fields)
                     {
                         __instance.Fields.RemoveAt(i);
                     }
+                });
+                foreach (int i in unneeded_fields)
+                {
+                    animation.RemoveTrackAt(i);
                 }
-
-                __instance.Clip.Asset.SetFromAnimX(new_Anim); // Update the clip's data
+                
+                
+                Msg("Saving file");
+                Engine.Current.LocalDB.SaveAssetAsync(animation).ContinueWith(task =>
+                {
+                    
+                    __instance.RunSynchronously(() =>
+                    {
+                        Msg("creating new static provider");
+                        StaticAnimationProvider hello = (__instance.Clip.Target as Component).Slot.AttachComponent<StaticAnimationProvider>();
+                        Msg("setting URI");
+                        hello.URL.Value = task.Result;
+                        __instance.Clip.Target = hello;
+                    });
+                });
 
                 //Hope it works!
             }

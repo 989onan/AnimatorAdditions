@@ -31,6 +31,9 @@
     <Reference Include="Elements.Core">
       <HintPath>$(ResonitePath)Elements.Core.dll</HintPath>
     </Reference>
+	  <Reference Include="FrooxEngine.Store">
+		  <HintPath>$(ResonitePath)FrooxEngine.Store.dll</HintPath>
+	  </Reference>
     <Reference Include="Elements.Assets">
       <HintPath>$(ResonitePath)Elements.Assets.dll</HintPath>
     </Reference>
