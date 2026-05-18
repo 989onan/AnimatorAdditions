@@ -28,6 +28,9 @@
     <Reference Include="FrooxEngine">
       <HintPath>$(ResonitePath)FrooxEngine.dll</HintPath>
     </Reference>
+	  <Reference Include="Renderite.Shared">
+		  <HintPath>$(ResonitePath)Renderite.Shared.dll</HintPath>
+	  </Reference>
     <Reference Include="Elements.Core">
       <HintPath>$(ResonitePath)Elements.Core.dll</HintPath>
     </Reference>
@@ -40,6 +43,19 @@
     <Reference Include="ResoniteModLoader">
       <HintPath>$(ResonitePath)Libraries\ResoniteModLoader.dll</HintPath>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(CopyToMods)'=='true'">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ResonitePath)rml_mods" />
