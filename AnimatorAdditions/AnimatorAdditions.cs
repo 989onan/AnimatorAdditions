@@ -88,7 +88,9 @@ namespace AnimatorAdditions
         //99% credit to NepuShiro!
         public static class DynBonePatch
         {
-            public static List<CodeInstruction> codes3 = new List<CodeInstruction>();
+            public static List<CodeInstruction> codes3 = new List<CodeInstruction>(); //points to loading the target slot field (syncref<slot>) within the code for pressing the copy component button context menu.
+            public static FieldInfo component_field = null; //points to the "Component" field within the async method which stores the component being copied.
+
 
             public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
             {
@@ -118,8 +120,9 @@ namespace AnimatorAdditions
                 List<CodeInstruction> codes2 =
                 [
                     new CodeInstruction(OpCodes.Dup),
-                    .. codes3,
-                    new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(DynBonePatch), nameof(DynBonePatch.patch_context_menu)))
+                    new CodeInstruction(OpCodes.Ldarg_0),
+                    new CodeInstruction(OpCodes.Ldloc_1),
+                    new CodeInstruction(OpCodes.Call, ((Delegate)DynBonePatch.patch_context_menu).Method)
                 ];
 
                 codes.InsertRange(insert_point+1, codes2);
@@ -129,13 +132,15 @@ namespace AnimatorAdditions
 
             public static IEnumerable<CodeInstruction> Transpiler2(IEnumerable<CodeInstruction> instructions)
             {
-                codes3.AddRange(instructions.ToList().GetRange(0, 7));
-
+                
+                //codes3.AddRange([instructions.ToList()[5], instructions.ToList()[6]]);
+                component_field = (FieldInfo)instructions.ToList()[6].operand; //yoink the field info for loading in the component field under 
                 return instructions;
             }
 
-            public static void patch_context_menu(ContextMenu menu, Slot instance, FrooxEngine.Component component)
+            public static void patch_context_menu(ContextMenu menu, SyncRef<Slot> instance, object __instance)
             {
+                FrooxEngine.Component component = (FrooxEngine.Component)component_field.GetValue(__instance);
                 Msg("attach component 1");
                 Msg("component type is: " + component.GetType().Name);
                 if (component.GetType().IsAssignableTo(typeof(DynamicBoneChain)))
@@ -144,7 +149,7 @@ namespace AnimatorAdditions
                     var newitem = menu.AddItem("Copy Dynamic Bone Linked", ((Uri)(null)), new colorX(1, 1, 1, 1));
 
                     ((IButton)newitem).LocalPressed += (IButton b, ButtonEventData e) => {
-                        DynamicBoneChain newcomponent = instance.AttachComponent<DynamicBoneChain>();
+                        DynamicBoneChain newcomponent = instance.Target.AttachComponent<DynamicBoneChain>();
                         newcomponent.CollideWithBody.DriveFrom(componentdyn.CollideWithBody, true);
                         newcomponent.CollideWithHead.DriveFrom(componentdyn.CollideWithHead, true);
                         newcomponent.CollideWithLeftHand.DriveFrom(componentdyn.CollideWithLeftHand, true);
