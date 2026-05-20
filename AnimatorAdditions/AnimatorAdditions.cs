@@ -73,13 +73,13 @@ namespace AnimatorAdditions
 
             MethodInfo stolencodethingy = AccessTools.GetDeclaredMethods(stateMachineType).FirstOrDefault(x => x.Name == "<TryReceive>b__1");
 
-            
+
             MethodInfo method = AccessTools.AsyncMoveNext(AccessTools.FirstMethod(stateMachineType, x => x.ReturnType == typeof(Task)));
 
             harmony.Patch(stolencodethingy, transpiler: new HarmonyMethod(DynBonePatch.Transpiler2));
 
             harmony.Patch(method, transpiler: new HarmonyMethod(DynBonePatch.Transpiler));
-            
+
 
             harmony.PatchAll();
 
@@ -90,7 +90,7 @@ namespace AnimatorAdditions
         {
             public static List<CodeInstruction> codes3 = new List<CodeInstruction>(); //points to loading the target slot field (syncref<slot>) within the code for pressing the copy component button context menu.
             public static FieldInfo component_field = null; //points to the "Component" field within the async method which stores the component being copied.
-
+            public static FieldInfo load_target = null; //points to the "Target" field within the SlotReciever which stores the syncref<slot> of the slot the component is being copied to.
 
             public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
             {
@@ -119,10 +119,12 @@ namespace AnimatorAdditions
 
                 List<CodeInstruction> codes2 =
                 [
-                    new CodeInstruction(OpCodes.Dup),
-                    new CodeInstruction(OpCodes.Ldarg_0),
-                    new CodeInstruction(OpCodes.Ldloc_1),
-                    new CodeInstruction(OpCodes.Call, ((Delegate)DynBonePatch.patch_context_menu).Method)
+                    codes[8],//load "this" of the class that can load the component being copied.
+                    codes[8],codes[9],codes[10],//load "this" of the class that can load the target slot syncref.                    
+                    //new CodeInstruction(OpCodes.Ldarg_0),
+                    //new CodeInstruction(OpCodes.Castclass, typeof(Object)),
+                    new CodeInstruction(OpCodes.Call, ((Delegate)DynBonePatch.patch_context_menu).Method),
+                    new CodeInstruction(OpCodes.Dup)
                 ];
 
                 codes.InsertRange(insert_point+1, codes2);
@@ -134,61 +136,71 @@ namespace AnimatorAdditions
             {
                 
                 //codes3.AddRange([instructions.ToList()[5], instructions.ToList()[6]]);
-                component_field = (FieldInfo)instructions.ToList()[6].operand; //yoink the field info for loading in the component field under 
+                component_field = (FieldInfo)instructions.ToList()[6].operand; //yoink the field info for loading in the component being copied field under the compiler generated class.
+                load_target = (FieldInfo)instructions.ToList()[3].operand; //yoink the loadfield instruction for SyncRef<Slot> Target.
                 return instructions;
             }
 
-            public static void patch_context_menu(ContextMenu menu, SyncRef<Slot> instance, object __instance)
+            public static void patch_context_menu(ContextMenu menu, object __instance, object __instance2)
             {
-                FrooxEngine.Component component = (FrooxEngine.Component)component_field.GetValue(__instance);
-                Msg("attach component 1");
-                Msg("component type is: " + component.GetType().Name);
-                if (component.GetType().IsAssignableTo(typeof(DynamicBoneChain)))
+                try
                 {
-                    DynamicBoneChain componentdyn = component as DynamicBoneChain;
-                    var newitem = menu.AddItem("Copy Dynamic Bone Linked", ((Uri)(null)), new colorX(1, 1, 1, 1));
+                    Msg("attach component 1");
+                    FrooxEngine.Component component = (FrooxEngine.Component)component_field.GetValue(__instance);
+                    SyncRef<Slot> target = (SyncRef<Slot>)load_target.GetValue(__instance2);
+                    //Msg("attach component 1");
+                    Msg("component type is: " + component.GetType().Name);
+                    if (component.GetType().IsAssignableTo(typeof(DynamicBoneChain)))
+                    {
+                        DynamicBoneChain componentdyn = component as DynamicBoneChain;
+                        ContextMenuItem newitem = menu.AddItem("Copy Dynamic Bone Linked", ((Uri)(null)), new colorX(1, 1, 1, 1));
 
-                    ((IButton)newitem).LocalPressed += (IButton b, ButtonEventData e) => {
-                        DynamicBoneChain newcomponent = instance.Target.AttachComponent<DynamicBoneChain>();
-                        newcomponent.CollideWithBody.DriveFrom(componentdyn.CollideWithBody, true);
-                        newcomponent.CollideWithHead.DriveFrom(componentdyn.CollideWithHead, true);
-                        newcomponent.CollideWithLeftHand.DriveFrom(componentdyn.CollideWithLeftHand, true);
-                        newcomponent.CollideWithOwnBody.DriveFrom(componentdyn.CollideWithOwnBody, true);
-                        newcomponent.CollideWithRightHand.DriveFrom(componentdyn.CollideWithRightHand, true);
-                        newcomponent.Damping.DriveFrom(componentdyn.Damping, true);
-                        newcomponent.Stiffness.DriveFrom(componentdyn.Stiffness, true);
-                        newcomponent.Elasticity.DriveFrom(componentdyn.Elasticity, true);
-                        newcomponent.Inertia.DriveFrom(componentdyn.Inertia, true);
-                        newcomponent.InertiaForce.DriveFrom(componentdyn.InertiaForce, true);
-                        newcomponent.GrabPriority.DriveFrom(componentdyn.GrabPriority, true);
-                        newcomponent.GrabSlipping.DriveFrom(componentdyn.GrabSlipping, true);
-                        newcomponent.GrabRadiusTolerance.DriveFrom(componentdyn.GrabRadiusTolerance, true);
-                        newcomponent.BaseBoneRadius.DriveFrom(componentdyn.BaseBoneRadius, true);
-                        newcomponent.AllowSteal.DriveFrom(componentdyn.AllowSteal, true);
-                        newcomponent.ActiveUserRootOnly.DriveFrom(componentdyn.ActiveUserRootOnly, true);
-                        newcomponent.DynamicPlayerCollision.DriveFrom(componentdyn.DynamicPlayerCollision, true);
-                        newcomponent.Gravity.DriveFrom(componentdyn.Gravity, true);
-                        newcomponent.GravitySpace.Default.DriveFrom(componentdyn.GravitySpace.Default, true);
-                        newcomponent.GravitySpace.LocalSpace.DriveFrom(componentdyn.GravitySpace.LocalSpace, true);
-                        newcomponent.GravitySpace.OverrideRootSpace.DriveFrom(componentdyn.GravitySpace.OverrideRootSpace, true);
-                        newcomponent.GravitySpace.UseParentSpace.DriveFrom(componentdyn.GravitySpace.UseParentSpace, true);
-                        newcomponent.IgnoreOwnLeftHand.DriveFrom(componentdyn.IgnoreOwnLeftHand, true);
-                        newcomponent.IgnoreOwnRightHand.DriveFrom(componentdyn.IgnoreOwnRightHand, true);
-                        newcomponent.IgnoreGrabOnFirstBone.DriveFrom(componentdyn.IgnoreGrabOnFirstBone, true);
-                        newcomponent.IsGrabbable.DriveFrom(componentdyn.IsGrabbable, true);
-                        newcomponent.GrabVibration.DriveFrom(componentdyn.GrabVibration, true);
-                        newcomponent.GrabTerminalBones.DriveFrom(componentdyn.GrabTerminalBones, true);
-                        newcomponent.MaxStretchRatio.DriveFrom(componentdyn.MaxStretchRatio, true);
-                        newcomponent.LocalForce.DriveFrom(componentdyn.LocalForce, true);
-                        newcomponent.Stiffness.DriveFrom(componentdyn.Stiffness, true);
-                        newcomponent.StretchRestoreSpeed.DriveFrom(componentdyn.StretchRestoreSpeed, true);
-                        newcomponent.UseUserGravityDirection.DriveFrom(componentdyn.UseUserGravityDirection, true);
-                        newcomponent.UseLocalUserSpace.DriveFrom(componentdyn.UseLocalUserSpace, true);
+                        newitem.Button.LocalPressed += (IButton b, ButtonEventData e) => {
+                            DynamicBoneChain newcomponent = target.Target.AttachComponent<DynamicBoneChain>();
+                            newcomponent.CollideWithBody.DriveFrom(componentdyn.CollideWithBody, true);
+                            newcomponent.CollideWithHead.DriveFrom(componentdyn.CollideWithHead, true);
+                            newcomponent.CollideWithLeftHand.DriveFrom(componentdyn.CollideWithLeftHand, true);
+                            newcomponent.CollideWithOwnBody.DriveFrom(componentdyn.CollideWithOwnBody, true);
+                            newcomponent.CollideWithRightHand.DriveFrom(componentdyn.CollideWithRightHand, true);
+                            newcomponent.Damping.DriveFrom(componentdyn.Damping, true);
+                            newcomponent.Stiffness.DriveFrom(componentdyn.Stiffness, true);
+                            newcomponent.Elasticity.DriveFrom(componentdyn.Elasticity, true);
+                            newcomponent.Inertia.DriveFrom(componentdyn.Inertia, true);
+                            newcomponent.InertiaForce.DriveFrom(componentdyn.InertiaForce, true);
+                            newcomponent.GrabPriority.DriveFrom(componentdyn.GrabPriority, true);
+                            newcomponent.GrabSlipping.DriveFrom(componentdyn.GrabSlipping, true);
+                            newcomponent.GrabRadiusTolerance.DriveFrom(componentdyn.GrabRadiusTolerance, true);
+                            newcomponent.BaseBoneRadius.DriveFrom(componentdyn.BaseBoneRadius, true);
+                            newcomponent.AllowSteal.DriveFrom(componentdyn.AllowSteal, true);
+                            newcomponent.ActiveUserRootOnly.DriveFrom(componentdyn.ActiveUserRootOnly, true);
+                            newcomponent.DynamicPlayerCollision.DriveFrom(componentdyn.DynamicPlayerCollision, true);
+                            newcomponent.Gravity.DriveFrom(componentdyn.Gravity, true);
+                            newcomponent.GravitySpace.Default.DriveFrom(componentdyn.GravitySpace.Default, true);
+                            newcomponent.GravitySpace.LocalSpace.DriveFrom(componentdyn.GravitySpace.LocalSpace, true);
+                            newcomponent.GravitySpace.OverrideRootSpace.DriveFrom(componentdyn.GravitySpace.OverrideRootSpace, true);
+                            newcomponent.GravitySpace.UseParentSpace.DriveFrom(componentdyn.GravitySpace.UseParentSpace, true);
+                            newcomponent.IgnoreOwnLeftHand.DriveFrom(componentdyn.IgnoreOwnLeftHand, true);
+                            newcomponent.IgnoreOwnRightHand.DriveFrom(componentdyn.IgnoreOwnRightHand, true);
+                            newcomponent.IgnoreGrabOnFirstBone.DriveFrom(componentdyn.IgnoreGrabOnFirstBone, true);
+                            newcomponent.IsGrabbable.DriveFrom(componentdyn.IsGrabbable, true);
+                            newcomponent.GrabVibration.DriveFrom(componentdyn.GrabVibration, true);
+                            newcomponent.GrabTerminalBones.DriveFrom(componentdyn.GrabTerminalBones, true);
+                            newcomponent.MaxStretchRatio.DriveFrom(componentdyn.MaxStretchRatio, true);
+                            newcomponent.LocalForce.DriveFrom(componentdyn.LocalForce, true);
+                            newcomponent.Stiffness.DriveFrom(componentdyn.Stiffness, true);
+                            newcomponent.StretchRestoreSpeed.DriveFrom(componentdyn.StretchRestoreSpeed, true);
+                            newcomponent.UseUserGravityDirection.DriveFrom(componentdyn.UseUserGravityDirection, true);
+                            newcomponent.UseLocalUserSpace.DriveFrom(componentdyn.UseLocalUserSpace, true);
 
 
 
 
-                    };
+                        };
+                    }
+                }
+                catch (Exception)
+                {
+                    //idc, pass.
                 }
                 
             }
