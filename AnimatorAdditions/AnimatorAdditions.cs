@@ -25,7 +25,7 @@ namespace AnimatorAdditions
 
         public override string Name => "AnimatorAdditions";
 
-        public override string Version => "0.0.0";
+        public override string Version => "1.0.0";
 
 
         public override void OnEngineInit()
