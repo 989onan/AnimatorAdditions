@@ -20,7 +20,7 @@ namespace AnimatorAdditions
         public static ModConfiguration Config;
 
 
-        public override string Author => "989onan";
+        public override string Author => "989onan, art0007i";
 
         public override string Link => "https://github.com/989onan/AnimatorAdditions";
 
@@ -34,7 +34,7 @@ namespace AnimatorAdditions
             Harmony harmony = new Harmony($"{Author}.{Name}");
             Msg("patching method for animator ui");
             harmony.Patch(typeof(Animator).GetMethod(nameof(Animator.BuildInspectorUI)), postfix: new HarmonyMethod(AnimatorAdditionsPatch.PostFix));
-
+            harmony.Patch(typeof(Animator).GetMethod("SetupFieldsAsync", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase | BindingFlags.IgnoreReturn), transpiler: new HarmonyMethod(AnimatorAdditionsPatch.Transpiler_SetupFieldsAsync));
 
         }
 
@@ -42,6 +42,61 @@ namespace AnimatorAdditions
 
         public class AnimatorAdditionsPatch
         {
+            public static IEnumerable<CodeInstruction> Transpiler_SetupFieldsAsync(IEnumerable<CodeInstruction> instructions, ILGenerator il)
+            {
+                Msg("patching method setupfieldsasync");
+                var codes = new List<CodeInstruction>(instructions);
+                var newcodes = new List<CodeInstruction>(instructions);
+                var indexes = new List<int>();
+
+                for (int i = 0; i < codes.Count; i++)
+                {
+                    if (codes[i].opcode == OpCodes.Brfalse && codes[i - 1].operand.ToString().Contains("IField"))
+                    {
+                        indexes.Add(i);
+                    }
+                }
+                indexes.Reverse();
+
+
+
+
+                for (int i = 0; i < indexes.Count; i++)
+                {
+
+
+
+                    var new_instructions = new List<CodeInstruction>
+                    {
+                        new CodeInstruction(OpCodes.Dup),
+                        new CodeInstruction(OpCodes.Ldarg_0),
+                        new CodeInstruction(OpCodes.Call, typeof(AnimatorAdditionsPatch).GetMethod(nameof(AnimatorAdditionsPatch.AddFieldAnyways), BindingFlags.Public | BindingFlags.Static)),
+                    };
+                    newcodes.InsertRange(indexes[i], new_instructions);
+                }
+
+
+                
+                Msg("=====================================================================================");
+                Msg("=====================================================================================");
+                Msg("=====================================================================================");
+                Msg("=====================================================================================");
+                for (int i = 0; i < newcodes.Count; i++)
+                {
+                    Msg("New Animator code instruction" + newcodes[i].opcode + " " + newcodes[i].operand );//" Labels: " + newcodes[i].labels.Join(k=>k+"")
+                }
+
+                return newcodes.AsEnumerable();
+            }
+
+            public static void AddFieldAnyways(IField mappedField, Animator __instance)
+            {
+                if(mappedField == null)
+                {
+                    __instance.Fields.Add();
+                }
+            }
+
             public static void PostFix(Animator __instance, UIBuilder ui)
             {
                 ui.Text("Animator Additions");
